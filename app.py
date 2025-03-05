@@ -1,32 +1,52 @@
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-try:
-    install('streamlit')
-    install('numpy')
-    install('Pillow')
-    install('google-generativeai')
-except Exception as e:
-    print(f"Error: {e}")
-
 import streamlit as st
-import os
-# import cv2
+import requests
+import base64
 import numpy as np
 from PIL import Image
-import google.generativeai as genai
+import io
 
-# Initialize the Gemini model
-genai.configure(api_key="AIzaSyCfpV-W8HOZ61pAj8shqcuYI_yQcNxphVo")
-model = genai.GenerativeModel("gemini-1.5-flash")
+# Gemini API 配置
+API_KEY = "AIzaSyCfpV-W8HOZ61pAj8shqcuYI_yQcNxphVo"
+URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
-def process_text_image(image, text_prompt="What is the name of this object? Give a short answer inside {}"):
-    """ Process an image and generate a text response """
-    response = model.generate_content([text_prompt, image])
-    return response.text
+def process_image_with_gemini(image, prompt="What is the name of this object? Give a short answer inside {}"):
+    # 将 PIL Image 转换为 base64
+    buffered = io.BytesIO()
+    image.save(buffered, format="JPEG")
+    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inlineData": {
+                    "mimeType": "image/jpeg",
+                    "data": img_str
+                }}
+            ]
+        }]
+    }
+    
+    try:
+        response = requests.post(URL, json=payload)
+        response_json = response.json()
+        
+        # 提取文本响应
+        if 'candidates' in response_json and response_json['candidates']:
+            text_response = response_json['candidates'][0]['content']['parts'][0]['text']
+            return text_response
+        else:
+            st.error("无法从 API 获取响应")
+            return None
+    except Exception as e:
+        st.error(f"API 调用错误: {e}")
+        return None
 
 def extract_food_name(response_text):
     """ Extract the food name from the AI-generated response """
+    if not response_text:
+        return None
+    
     start, end = response_text.find("{"), response_text.find("}")
     return response_text[start+1:end].strip() if start != -1 and end != -1 else None
 
@@ -43,7 +63,7 @@ if uploaded_file is not None:
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
     st.write("Identifying...")
-    response_text = process_text_image(image)
+    response_text = process_image_with_gemini(image)
     food_name = extract_food_name(response_text)
 
     if food_name:
@@ -63,3 +83,8 @@ if uploaded_file is not None:
 st.write("### Current Grocery List:")
 for item in st.session_state.grocery_list:
     st.write(f"- **{item['name']}** (x{item['quantity']}) - {item['description']}")
+
+# Add a clear list button
+if st.button("Clear List"):
+    st.session_state.grocery_list = []
+    st.success("Grocery list cleared!")
