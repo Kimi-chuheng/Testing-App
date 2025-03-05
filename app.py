@@ -1,3 +1,14 @@
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+try:
+    install('streamlit')
+    install('numpy')
+    install('Pillow')
+    install('google-generativeai')
+except Exception as e:
+    print(f"Error: {e}")
+
 import streamlit as st
 import os
 # import cv2
