@@ -10,6 +10,10 @@ API_KEY = "AIzaSyCfpV-W8HOZ61pAj8shqcuYI_yQcNxphVo"
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
 def process_image_with_gemini(image, prompt="What is the name of this object? Give a short answer inside {}"):
+    # 转换图像模式为 RGB
+    if image.mode == 'RGBA':
+        image = image.convert('RGB')
+    
     # 将 PIL Image 转换为 base64
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
